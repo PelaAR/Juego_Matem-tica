@@ -1891,6 +1891,12 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
+
+    #screen-duel .duel-panel,
+#screen-duel button {
+  touch-action: none;
+}
+
     .duel-pill.p1 { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
     .duel-pill.p2 { background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; }
     .duel-pill .hud-lbl { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4817,7 +4823,7 @@
           });
         }
 
-        bindDuelEvents() {
+bindDuelEvents() {
           const d = this.dom.duel;
 
           this.dom.btnChooseDuel.addEventListener('click', () => {
@@ -4840,10 +4846,41 @@
             this.applyDuelLayout();
           });
 
-          d.panelsBox.addEventListener('click', (e) => {
+          // Multitouch real en móviles y tablets (incluye toques simultáneos en el mismo frame)
+          d.root.addEventListener('touchstart', (e) => {
+            let touchedPanel = false;
+
+            for (const touch of e.changedTouches) {
+              const rawTarget = touch.target || document.elementFromPoint(touch.clientX, touch.clientY);
+              const el = rawTarget && rawTarget.nodeType === 1 ? rawTarget : rawTarget && rawTarget.parentElement;
+              if (!el) continue;
+
+              const panel = el.closest('.duel-panel');
+              if (!panel) continue;
+
+              touchedPanel = true;
+              const btn = el.closest('.mc-btn');
+              if (btn && !btn.disabled) {
+                this.submitDuelAnswer(Number(panel.dataset.player), Number(btn.dataset.idx), btn);
+              }
+            }
+
+            // Bloquea pinch-to-zoom y ghost clicks sin interferir con 1 toque en el HUD superior
+            if (touchedPanel || e.touches.length > 1) {
+              e.preventDefault();
+            }
+          }, { passive: false });
+
+          // Respuesta instantánea con mouse / lápiz óptico en PC (sin duplicar en pantallas táctiles)
+          d.root.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'touch' && 'ontouchstart' in window) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
             const btn = e.target.closest('.mc-btn');
-            const panel = e.target.closest('.duel-panel');
-            if (!btn || !panel) return;
+            const panel = btn ? btn.closest('.duel-panel') : null;
+            if (!btn || !panel || btn.disabled) return;
+
+            e.preventDefault();
             this.submitDuelAnswer(Number(panel.dataset.player), Number(btn.dataset.idx), btn);
           });
         }
